@@ -14,6 +14,15 @@ export function storeChildProfile(profile) {
   window.sessionStorage.setItem(profileStorageKey, JSON.stringify(profile));
 }
 
+export function readStoredAssessment() {
+  try {
+    const stored = window.sessionStorage.getItem(assessmentStorageKey);
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    return null;
+  }
+}
+
 function normalizeProfile(data) {
   const child = data?.child || data?.profile?.child || data?.children?.[0] || data;
 

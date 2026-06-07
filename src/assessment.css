@@ -442,6 +442,12 @@ a {
   line-height: 1.6;
 }
 
+.submit-note-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .theme-coral .assessment-kicker { color: var(--assessment-coral); }
 .theme-gold .assessment-kicker { color: var(--assessment-gold); }
 .theme-blue .assessment-kicker { color: var(--assessment-blue); }

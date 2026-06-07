@@ -58,7 +58,7 @@ export class JourneyTimeline {
     };
 
     // Initialize animations for each section
-    for (let i = 1; i <= 10; i++) {
+    for (let i = 1; i <= 9; i++) {
       const sectionId = `#section-${i}`;
       
       // Animate text words
@@ -75,9 +75,6 @@ export class JourneyTimeline {
         staggerItems('.step', sectionId, "top 60%");
       }
       if (i === 9) {
-        staggerItems('.minimal-testimonial', sectionId, "top 60%");
-      }
-      if (i === 10) {
         staggerItems('.hero-actions', sectionId, "top 80%");
       }
     }

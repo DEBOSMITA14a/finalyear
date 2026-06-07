@@ -148,10 +148,23 @@ function LandingPage() {
             <div className="content-wrapper align-center">
               <h1 className="section-title animate-words">How It Works</h1>
               <div className="stepper-flow">
-                <div className="step"><span>1</span> Create Profile</div>
-                <div className="step"><span>2</span> Complete Assessments</div>
-                <div className="step"><span>3</span> Get Insights</div>
-                <div className="step"><span>4</span> Consult Expert</div>
+                {[
+                  ['01', 'Create Profile', 'Set up your child profile with the basic developmental and family context needed to begin.'],
+                  ['02', 'Complete Assessments', 'Move through guided parent and play-based assessments designed to capture meaningful signals.'],
+                  ['03', 'Get Insights', 'Receive a structured screening summary with risk indicators, patterns, and practical next steps.'],
+                  ['04', 'Consult Expert', 'Use the results to start a more informed discussion with a clinician or specialist.']
+                ].map(([number, title, copy]) => (
+                  <article className="step" key={number}>
+                    <div className="step-head">
+                      <span className="step-number">{number}</span>
+                      <span className="step-node" aria-hidden="true"></span>
+                    </div>
+                    <div className="step-body">
+                      <h3>{title}</h3>
+                      <p>{copy}</p>
+                    </div>
+                  </article>
+                ))}
               </div>
             </div>
           </section>
@@ -187,22 +200,7 @@ function LandingPage() {
             </div>
           </section>
 
-          <section className="journey-section min-apple testimonial-section" id="section-9">
-            <div className="content-wrapper align-center">
-              <div className="testimonials-grid">
-                <blockquote className="minimal-testimonial">
-                  "Finally, clarity without the weeks of waiting and clinical anxiety."
-                  <cite>- Sarah M., Parent</cite>
-                </blockquote>
-                <blockquote className="minimal-testimonial">
-                  "The insights allowed us to adapt immediately and see profound improvements."
-                  <cite>- Dr. James T., Clinician</cite>
-                </blockquote>
-              </div>
-            </div>
-          </section>
-
-          <section className="journey-section min-apple final-cta-section" id="section-10">
+          <section className="journey-section min-apple final-cta-section" id="section-9">
             <div className="cta-content">
               <h1 className="mega-statement animate-words">Don't Wait to Understand What Matters Most</h1>
               <p className="cta-sub animate-words">Early insight leads to better outcomes.</p>

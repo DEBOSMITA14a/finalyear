@@ -215,7 +215,10 @@ function AssessmentPage() {
             <div className="submit-note">
               <strong>Assessment captured.</strong>
               <p>{submitNote}</p>
-              <a href="/dashboard.html">Return to dashboard</a>
+              <div className="submit-note-actions">
+                <a href="/result.html">View result page</a>
+                <a href="/dashboard.html">Return to dashboard</a>
+              </div>
             </div>
           )}
         </section>

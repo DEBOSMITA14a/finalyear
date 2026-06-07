@@ -114,7 +114,7 @@ function AuthPage() {
   };
 
   return (
-    <div className="auth-layout">
+    <div className="auth-layout" data-mode={mode} data-phase={phase}>
       <div className="bg-glow top-right"></div>
       <div className="bg-glow bottom-left"></div>
 
@@ -182,13 +182,15 @@ function AuthPage() {
           <div className="forms-container">
             {mode === 'signup' && !isOtp && (
               <form id="form-signup" className="auth-form active" onSubmit={handleFormSubmit}>
-                <div className="input-group">
-                  <label>Full Name</label>
-                  <input name="parentName" type="text" placeholder="John Doe" required />
-                </div>
-                <div className="input-group">
-                  <label>Email Address</label>
-                  <input name="email" type="email" placeholder="john@example.com" required />
+                <div className="input-row">
+                  <div className="input-group">
+                    <label>Full Name</label>
+                    <input name="parentName" type="text" placeholder="John Doe" required />
+                  </div>
+                  <div className="input-group">
+                    <label>Email Address</label>
+                    <input name="email" type="email" placeholder="john@example.com" required />
+                  </div>
                 </div>
 
                 <div className="input-row">

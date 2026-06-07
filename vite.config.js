@@ -9,7 +9,8 @@ export default defineConfig({
         main: 'index.html',
         auth: 'auth.html',
         dashboard: 'dashboard.html',
-        assessment: 'assessment.html'
+        assessment: 'assessment.html',
+        result: 'result.html'
       }
     }
   }

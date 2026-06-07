@@ -24,7 +24,7 @@ const steps = [
     id: 'game-one',
     number: '02',
     label: 'Game',
-    title: 'Attention Garden',
+    title: 'Attention Sky',
     eyebrow: 'Focus and response play',
     copy: 'A play session designed to observe sustained attention, impulse control, and response timing through short adaptive rounds.',
     duration: '8 min',
@@ -32,15 +32,15 @@ const steps = [
     repeat: 'Play again'
   },
   {
-    id: 'game-two',
+    id: 'result',
     number: '03',
-    label: 'Game',
-    title: 'Pattern Quest',
-    eyebrow: 'Memory and sequencing',
-    copy: 'A second game layer that tracks visual memory, sequencing, flexibility, and how confidently your child adjusts to new rules.',
-    duration: '10 min',
-    primary: 'Open game',
-    repeat: 'Play again'
+    label: 'Results',
+    title: 'Diagnostic Report',
+    eyebrow: 'Screening interpretation & guidance',
+    copy: "Review your child's detailed performance analysis, attention profile, and recommended next steps or professional guidance.",
+    duration: 'Ready',
+    primary: 'View results',
+    repeat: 'View results'
   }
 ];
 
@@ -76,20 +76,44 @@ function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    if (!hasStoredAssessment()) return;
-    setCompleted((previous) => {
-      const next = new Set(previous);
-      next.add('assessment');
-      return next;
-    });
+    const completedSet = new Set();
+    if (hasStoredAssessment()) {
+      completedSet.add('assessment');
+    }
+    try {
+      const stored = window.sessionStorage.getItem('neurovice_completed_steps');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        parsed.forEach(id => completedSet.add(id));
+      }
+    } catch (e) {
+      console.error('Failed to load completed steps', e);
+    }
+    setCompleted(completedSet);
   }, []);
 
   const completeCurrentStep = () => {
     setCompleted((previous) => {
       const next = new Set(previous);
       next.add(active.id);
+      try {
+        window.sessionStorage.setItem('neurovice_completed_steps', JSON.stringify(Array.from(next)));
+      } catch (e) {
+        console.error('Failed to save completed steps', e);
+      }
       return next;
     });
+  };
+
+  const handlePrimaryAction = () => {
+    if (active.id === 'assessment') {
+      window.location.href = '/assessment.html';
+    } else if (active.id === 'result') {
+      completeCurrentStep();
+      window.location.href = '/result.html';
+    } else {
+      completeCurrentStep();
+    }
   };
 
   const proceed = () => {
@@ -102,11 +126,12 @@ function DashboardPage() {
   };
 
   return (
-    <main className="dashboard-page">
-      <div className="dashboard-bg" aria-hidden="true">
-        <div className="flow-line flow-one"></div>
-        <div className="flow-line flow-two"></div>
-      </div>
+    <>
+      <main className={`dashboard-page ${active.id === 'game-one' ? 'theme-kid-sky' : ''}`}>
+        <div className="dashboard-bg" aria-hidden="true">
+          <div className="flow-line flow-one"></div>
+          <div className="flow-line flow-two"></div>
+        </div>
 
       <nav className="dashboard-nav" aria-label="Dashboard navigation">
         <a className="dashboard-brand" href="/">
@@ -114,7 +139,6 @@ function DashboardPage() {
           <span>NeuroVice</span>
         </a>
         <div className="dashboard-nav-actions">
-          <button type="button">Parent Notes</button>
           <a href="/auth.html?mode=signin">Switch Account</a>
         </div>
       </nav>
@@ -181,7 +205,7 @@ function DashboardPage() {
             <button
               className="primary-action"
               type="button"
-              onClick={active.id === 'assessment' ? () => { window.location.href = '/assessment.html'; } : completeCurrentStep}
+              onClick={handlePrimaryAction}
             >
               {completed.has(active.id) ? active.repeat : active.primary}
             </button>
@@ -211,7 +235,8 @@ function DashboardPage() {
           </button>
         ))}
       </section>
-    </main>
+      </main>
+    </>
   );
 }
 
