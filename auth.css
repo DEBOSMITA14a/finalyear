@@ -749,7 +749,8 @@ input::placeholder {
 
   .auth-card {
     max-height: min(760px, calc(100dvh - 28px));
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
     padding: 22px 26px;
   }
 
@@ -769,32 +770,32 @@ input::placeholder {
 }
 
 @media (min-width: 769px) {
-  .auth-layout[data-mode="signup"][data-phase="form"] .auth-card {
+  .auth-layout[data-mode="signup"][data-phase="parent_form"] .auth-card {
     max-height: calc(100dvh - 22px);
     padding: 18px 24px;
   }
 
-  .auth-layout[data-mode="signup"][data-phase="form"] .auth-header {
+  .auth-layout[data-mode="signup"][data-phase="parent_form"] .auth-header {
     margin-bottom: 14px;
   }
 
-  .auth-layout[data-mode="signup"][data-phase="form"] .auth-header h2 {
+  .auth-layout[data-mode="signup"][data-phase="parent_form"] .auth-header h2 {
     font-size: clamp(1.95rem, 2.4vw, 2.55rem);
   }
 
-  .auth-layout[data-mode="signup"][data-phase="form"] .auth-header p {
+  .auth-layout[data-mode="signup"][data-phase="parent_form"] .auth-header p {
     font-size: 0.9rem;
   }
 
-  .auth-layout[data-mode="signup"][data-phase="form"] .auth-tabs {
+  .auth-layout[data-mode="signup"][data-phase="parent_form"] .auth-tabs {
     margin-bottom: 16px;
   }
 
-  .auth-layout[data-mode="signup"][data-phase="form"] .tab-btn {
+  .auth-layout[data-mode="signup"][data-phase="parent_form"] .tab-btn {
     padding: 10px 14px;
   }
 
-  .auth-layout[data-mode="signup"][data-phase="form"] .input-group {
+  .auth-layout[data-mode="signup"][data-phase="parent_form"] .input-group {
     margin-bottom: 10px;
   }
 

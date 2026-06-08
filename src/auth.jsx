@@ -10,8 +10,10 @@ const initialModeFromUrl = () => {
 
 function AuthPage() {
   const [mode, setMode] = useState(initialModeFromUrl);
-  const [phase, setPhase] = useState('form');
+  // phases: 'parent_form', 'otp', 'child_form'
+  const [phase, setPhase] = useState('parent_form');
   const [isSubmitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [otpMessage, setOtpMessage] = useState({
     title: 'Verify Your Identity',
     subtitle: "We've sent a 6-digit verification code to your device. Enter it below to continue."
@@ -22,8 +24,8 @@ function AuthPage() {
 
   const isOtp = phase === 'otp';
   const activeSubmitText = useMemo(() => {
-    if (isSubmitting) return mode === 'signin' ? 'Signing in...' : 'Creating account...';
-    return mode === 'signin' ? 'Sign In' : 'Start Your Journey';
+    if (isSubmitting) return mode === 'signin' ? 'Signing in...' : 'Processing...';
+    return mode === 'signin' ? 'Sign In' : 'Continue to Verification';
   }, [isSubmitting, mode]);
 
   useEffect(() => {
@@ -47,26 +49,40 @@ function AuthPage() {
     setPhase('otp');
   };
 
-  const handleFormSubmit = (event) => {
+  const handleParentSubmit = (event) => {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-
-    if (mode === 'signup') {
-      const childName = formData.get('childName') || 'Alex';
-      const childAge = formData.get('childAge') || '5';
-      storeChildProfile({
-        name: String(childName),
-        age: String(childAge)
-      });
-    } else if (!window.sessionStorage.getItem('neurovice_child_profile')) {
-      storeChildProfile({
-        name: 'Alex',
-        age: '5'
-      });
-    }
-
     setSubmitting(true);
     window.setTimeout(showOtp, 650);
+  };
+
+  const handleChildSubmit = (event) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const childName = formData.get('childName') || 'Alex';
+    const dobString = formData.get('dateOfBirth');
+    
+    let age = '5';
+    if (dobString) {
+      const dobDate = new Date(dobString);
+      const today = new Date();
+      let calculatedAge = today.getFullYear() - dobDate.getFullYear();
+      const m = today.getMonth() - dobDate.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < dobDate.getDate())) {
+        calculatedAge--;
+      }
+      age = String(Math.max(0, calculatedAge));
+    }
+    
+    // Simulate calculating age or just storing
+    storeChildProfile({
+      name: String(childName),
+      age: age
+    });
+
+    setSubmitting(true);
+    window.setTimeout(() => {
+      window.location.href = '/dashboard.html';
+    }, 900);
   };
 
   const handleOtpChange = (index, value) => {
@@ -89,7 +105,7 @@ function AuthPage() {
   const handleOtpPaste = (event) => {
     event.preventDefault();
     const pasted = event.clipboardData.getData('text').slice(0, otp.length).split('');
-    const nextOtp = otp.map((value, index) => pasted[index] || value);
+    const nextOtp = otp.map((value, idx) => pasted[idx] || value);
     setOtp(nextOtp);
     otpRefs.current[Math.min(pasted.length, otp.length - 1)]?.focus();
   };
@@ -98,7 +114,12 @@ function AuthPage() {
     event.preventDefault();
     setSubmitting(true);
     window.setTimeout(() => {
-      window.location.href = '/dashboard.html';
+      setSubmitting(false);
+      if (mode === 'signup') {
+        setPhase('child_form');
+      } else {
+        window.location.href = '/dashboard.html';
+      }
     }, 900);
   };
 
@@ -111,6 +132,10 @@ function AuthPage() {
     });
     setCountdown(30);
     otpRefs.current[0]?.focus();
+  };
+
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
   };
 
   return (
@@ -157,7 +182,9 @@ function AuthPage() {
         <div className="auth-card" id="auth-card">
           <div className={`auth-header ${isOtp ? 'hidden' : ''}`} id="auth-main-header">
             <h2>NeuroVice</h2>
-            <p>Continue your journey</p>
+            <p>
+              {phase === 'child_form' ? 'Tell us about your child' : 'Continue your journey'}
+            </p>
           </div>
 
           <div className={`auth-header ${isOtp ? '' : 'hidden'}`} id="auth-otp-header">
@@ -171,7 +198,7 @@ function AuthPage() {
             <p id="otp-subtitle">{otpMessage.subtitle}</p>
           </div>
 
-          {!isOtp && (
+          {phase === 'parent_form' && (
             <div className="auth-tabs" id="auth-tabs" data-active={mode}>
               <div className="tab-highlight"></div>
               <button className={`tab-btn ${mode === 'signup' ? 'active' : ''}`} data-tab="signup" onClick={() => setMode('signup')}>Create Account</button>
@@ -180,50 +207,77 @@ function AuthPage() {
           )}
 
           <div className="forms-container">
-            {mode === 'signup' && !isOtp && (
-              <form id="form-signup" className="auth-form active" onSubmit={handleFormSubmit}>
+            {mode === 'signup' && phase === 'parent_form' && (
+              <form id="form-signup-parent" className="auth-form active" onSubmit={handleParentSubmit}>
+                <div className="input-group">
+                  <label>Full Name</label>
+                  <input name="userName" type="text" placeholder="John Doe" required />
+                </div>
+                
                 <div className="input-row">
-                  <div className="input-group">
-                    <label>Full Name</label>
-                    <input name="parentName" type="text" placeholder="John Doe" required />
-                  </div>
                   <div className="input-group">
                     <label>Email Address</label>
-                    <input name="email" type="email" placeholder="john@example.com" required />
+                    <input name="emailAddress" type="email" placeholder="john@example.com" required />
+                  </div>
+                  <div className="input-group phone-group">
+                    <label>WhatsApp Number</label>
+                    <div className="phone-input">
+                      <select className="country-code" defaultValue="+91">
+                        <option value="+91">+91</option>
+                        <option value="+1">+1</option>
+                        <option value="+44">+44</option>
+                      </select>
+                      <input name="whatsappNumber" type="tel" pattern="[0-9]{10}" maxLength="10" onInput={(e) => e.target.value = e.target.value.replace(/[^0-9]/g, '')} placeholder="9876543210" required />
+                    </div>
                   </div>
                 </div>
 
                 <div className="input-row">
                   <div className="input-group">
-                    <label>Child Name</label>
-                    <input name="childName" type="text" placeholder="Alex" required />
+                    <label>Address</label>
+                    <input name="address" type="text" placeholder="123 Main St" required />
                   </div>
                   <div className="input-group">
-                    <label>Age (0-18)</label>
-                    <input name="childAge" type="number" min="0" max="18" placeholder="5" required />
+                    <label>Aadhaar ID</label>
+                    <input name="aadhaarId" type="text" pattern="[0-9]{12}" maxLength="12" onInput={(e) => e.target.value = e.target.value.replace(/[^0-9]/g, '')} placeholder="123456789012" required />
                   </div>
                 </div>
 
-                <div className="input-group phone-group">
-                  <label>WhatsApp Number</label>
-                  <div className="phone-input">
-                    <select className="country-code" defaultValue="+91">
-                      <option value="+91">+91</option>
-                      <option value="+1">+1</option>
-                      <option value="+44">+44</option>
-                    </select>
-                    <input name="whatsapp" type="tel" placeholder="9876543210" required />
-                  </div>
+                <div className="input-group">
+                  <label>Relation with Child</label>
+                  <select name="relationWithChild" style={{ padding: '12px 14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', background: 'rgba(0, 0, 0, 0.2)', color: 'var(--text-primary)', outline: 'none' }} required>
+                    <option value="" disabled selected>Select Relation</option>
+                    <option value="Father">Father</option>
+                    <option value="Mother">Mother</option>
+                    <option value="Guardian">Guardian</option>
+                  </select>
                 </div>
 
                 <div className="input-row">
                   <div className="input-group">
                     <label>Password</label>
-                    <input name="password" type="password" placeholder="........" required />
+                    <div className="password-input" style={{ position: 'relative' }}>
+                      <input name="password" type={showPassword ? "text" : "password"} placeholder="........" style={{ paddingRight: '40px' }} required />
+                      <button type="button" onClick={togglePasswordVisibility} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex' }}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          {showPassword ? (
+                            <>
+                              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                              <line x1="1" y1="1" x2="23" y2="23"></line>
+                            </>
+                          ) : (
+                            <>
+                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                              <circle cx="12" cy="12" r="3"></circle>
+                            </>
+                          )}
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                   <div className="input-group">
                     <label>Confirm Password</label>
-                    <input name="confirmPassword" type="password" placeholder="........" required />
+                    <input name="confirmPassword" type={showPassword ? "text" : "password"} placeholder="........" required />
                   </div>
                 </div>
 
@@ -235,8 +289,8 @@ function AuthPage() {
               </form>
             )}
 
-            {mode === 'signin' && !isOtp && (
-              <form id="form-signin" className="auth-form active" onSubmit={handleFormSubmit}>
+            {mode === 'signin' && phase === 'parent_form' && (
+              <form id="form-signin" className="auth-form active" onSubmit={handleParentSubmit}>
                 <div className="input-group">
                   <label>Email or WhatsApp Number</label>
                   <input name="identifier" type="text" placeholder="john@example.com or +91..." required />
@@ -246,7 +300,24 @@ function AuthPage() {
                     <label>Password</label>
                     <a href="#" className="forgot-link">Forgot Password?</a>
                   </div>
-                  <input name="password" type="password" placeholder="........" required />
+                  <div className="password-input" style={{ position: 'relative' }}>
+                    <input name="password" type={showPassword ? "text" : "password"} placeholder="........" style={{ paddingRight: '40px' }} required />
+                    <button type="button" onClick={togglePasswordVisibility} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex' }}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        {showPassword ? (
+                          <>
+                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                            <line x1="1" y1="1" x2="23" y2="23"></line>
+                          </>
+                        ) : (
+                          <>
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                          </>
+                        )}
+                      </svg>
+                    </button>
+                  </div>
                 </div>
 
                 <button type="submit" className="cta-btn primary" style={{ marginTop: '24px' }} disabled={isSubmitting}>{activeSubmitText}</button>
@@ -293,6 +364,40 @@ function AuthPage() {
                   </svg>
                   End-to-end encrypted verification
                 </div>
+              </form>
+            )}
+
+            {mode === 'signup' && phase === 'child_form' && (
+              <form id="form-signup-child" className="auth-form active" onSubmit={handleChildSubmit}>
+                <div className="input-group">
+                  <label>Child Name</label>
+                  <input name="childName" type="text" placeholder="Alex" required />
+                </div>
+                
+                <div className="input-row">
+                  <div className="input-group">
+                    <label>Date of Birth</label>
+                    <input name="dateOfBirth" type="date" style={{ colorScheme: 'dark' }} required />
+                  </div>
+                  <div className="input-group">
+                    <label>Gender</label>
+                    <select name="gender" style={{ padding: '12px 14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', background: 'rgba(0, 0, 0, 0.2)', color: 'var(--text-primary)', outline: 'none' }} required>
+                      <option value="" disabled selected>Select Gender</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="input-group">
+                  <label>Aadhaar ID</label>
+                  <input name="aadharId" type="text" pattern="[0-9]{12}" maxLength="12" onInput={(e) => e.target.value = e.target.value.replace(/[^0-9]/g, '')} placeholder="123456789012" required />
+                </div>
+
+                <button type="submit" className="cta-btn primary" style={{ marginTop: '24px' }} disabled={isSubmitting}>
+                  {isSubmitting ? 'Creating Account...' : 'Complete Profile & Start'}
+                </button>
               </form>
             )}
           </div>
