@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../auth.css';
-import { storeChildProfile } from './api.js';
+import { storeChildProfile, readAuthSession, signUpParent, verifyOtp, createChild, createParent } from './api.js';
 
 const initialModeFromUrl = () => {
   const params = new URLSearchParams(window.location.search);
@@ -10,13 +10,13 @@ const initialModeFromUrl = () => {
 
 function AuthPage() {
   const [mode, setMode] = useState(initialModeFromUrl);
-  // phases: 'parent_form', 'otp', 'child_form'
   const [phase, setPhase] = useState('parent_form');
   const [isSubmitting, setSubmitting] = useState(false);
+  const [authError, setAuthError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [otpMessage, setOtpMessage] = useState({
     title: 'Verify Your Identity',
-    subtitle: "We've sent a 6-digit verification code to your device. Enter it below to continue."
+    subtitle: 'Enter your verification code to continue.'
   });
   const [countdown, setCountdown] = useState(30);
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
@@ -35,54 +35,119 @@ function AuthPage() {
 
   useEffect(() => {
     if (!isOtp) return;
-
     setCountdown(30);
     const interval = window.setInterval(() => {
       setCountdown((value) => Math.max(value - 1, 0));
     }, 1000);
-
     return () => window.clearInterval(interval);
   }, [isOtp, otpMessage.title]);
 
-  const showOtp = () => {
-    setSubmitting(false);
-    setPhase('otp');
-  };
-
-  const handleParentSubmit = (event) => {
-    event.preventDefault();
-    setSubmitting(true);
-    window.setTimeout(showOtp, 650);
-  };
-
-  const handleChildSubmit = (event) => {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const childName = formData.get('childName') || 'Alex';
-    const dobString = formData.get('dateOfBirth');
-    
-    let age = '5';
-    if (dobString) {
-      const dobDate = new Date(dobString);
-      const today = new Date();
-      let calculatedAge = today.getFullYear() - dobDate.getFullYear();
-      const m = today.getMonth() - dobDate.getMonth();
-      if (m < 0 || (m === 0 && today.getDate() < dobDate.getDate())) {
-        calculatedAge--;
-      }
-      age = String(Math.max(0, calculatedAge));
+  const getErrorMessage = (error) => {
+    if (typeof error === 'string') return error;
+    if (error?.data) {
+      if (typeof error.data === 'string') return error.data;
+      return error.data?.message || error.data?.error || error.message || 'Something went wrong. Please try again.';
     }
-    
-    // Simulate calculating age or just storing
-    storeChildProfile({
-      name: String(childName),
-      age: age
-    });
+    return error?.message || 'Something went wrong. Please try again.';
+  };
 
+  const handleParentSubmit = async (event) => {
+    event.preventDefault();
+    setAuthError('');
     setSubmitting(true);
-    window.setTimeout(() => {
+
+    try {
+      if (mode === 'signup') {
+        const formData = new FormData(event.currentTarget);
+        const countryCode = formData.get('countryCode') || '+91';
+        const password = String(formData.get('password') || '');
+        const confirmPassword = String(formData.get('confirmPassword') || '');
+
+        if (password !== confirmPassword) {
+          setAuthError('Password and confirm password do not match.');
+          setSubmitting(false);
+          return;
+        }
+
+        const signupData = {
+          userName: String(formData.get('userName') || '').trim(),
+          emailAddress: String(formData.get('emailAddress') || '').trim(),
+          whatsappNumber: `${countryCode}${String(formData.get('whatsappNumber') || '').trim()}`,
+          address: String(formData.get('address') || '').trim(),
+          aadhaarId: String(formData.get('aadhaarId') || '').trim(),
+          relationWithChild: String(formData.get('relationWithChild') || ''),
+          password
+        };
+
+        // Store signup data locally - NO /api/auth/otp/request CALL AT ALL!
+        const session = {
+          email: signupData.emailAddress,
+          signupData: signupData
+        };
+        window.sessionStorage.setItem('neurovice_auth_session', JSON.stringify(session));
+
+        // Go directly to OTP screen
+        setOtp(['', '', '', '', '', '']);
+        setPhase('otp');
+      } else {
+        // Sign in flow
+        const formData = new FormData(event.currentTarget);
+        // Add your sign in logic here
+        window.setTimeout(() => {
+          window.location.href = '/dashboard.html';
+        }, 600);
+      }
+    } catch (error) {
+      console.error(error);
+      setAuthError(getErrorMessage(error));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleChildSubmit = async (event) => {
+    event.preventDefault();
+    setAuthError('');
+    setSubmitting(true);
+
+    try {
+      const formData = new FormData(event.currentTarget);
+      const childData = {
+        childName: String(formData.get('childName') || '').trim(),
+        gender: String(formData.get('gender') || ''),
+        dateOfBirth: String(formData.get('dateOfBirth') || ''),
+        aadharId: String(formData.get('aadharId') || '').trim()
+      };
+
+      const childResponse = await createChild(childData);
+      const childId = childResponse.childId || childResponse.id;
+
+      // Calculate age for profile
+      let age = '5';
+      if (childData.dateOfBirth) {
+        const dobDate = new Date(childData.dateOfBirth);
+        const today = new Date();
+        let calculatedAge = today.getFullYear() - dobDate.getFullYear();
+        const m = today.getMonth() - dobDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < dobDate.getDate())) {
+          calculatedAge--;
+        }
+        age = String(Math.max(0, calculatedAge));
+      }
+
+      storeChildProfile({
+        name: childData.childName,
+        age: age,
+        id: childId
+      });
+
       window.location.href = '/dashboard.html';
-    }, 900);
+    } catch (error) {
+      console.error(error);
+      setAuthError(getErrorMessage(error));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleOtpChange = (index, value) => {
@@ -90,7 +155,6 @@ function AuthPage() {
     const nextOtp = [...otp];
     nextOtp[index] = nextValue;
     setOtp(nextOtp);
-
     if (nextValue && index < otp.length - 1) {
       otpRefs.current[index + 1]?.focus();
     }
@@ -110,25 +174,64 @@ function AuthPage() {
     otpRefs.current[Math.min(pasted.length, otp.length - 1)]?.focus();
   };
 
-  const handleOtpSubmit = (event) => {
+  const handleOtpSubmit = async (event) => {
     event.preventDefault();
+    setAuthError('');
+    const code = otp.join('');
+    if (code.length !== otp.length) {
+      setAuthError('Please enter the complete 6-digit OTP.');
+      return;
+    }
+
+    // Check client-side if OTP is 123456 (NO BACKEND CALL!)
+    if (code !== '123456') {
+      setAuthError('Invalid OTP. Please enter 123456.');
+      return;
+    }
+    
     setSubmitting(true);
-    window.setTimeout(() => {
-      setSubmitting(false);
+
+    try {
       if (mode === 'signup') {
+        // Directly create parent user via /api/user/create
+        const session = readAuthSession();
+        if (!session?.signupData) {
+          throw new Error('Signup data not found in session');
+        }
+        console.log('Calling /api/user/create to create parent...');
+        const parentResult = await createParent(session.signupData);
+        
+        // Get parentId from response
+        const parentId = parentResult.parentId || parentResult.parent_id || parentResult.id;
+        if (!parentId) {
+          throw new Error('Parent ID not returned from backend');
+        }
+        console.log('Parent created successfully with ID:', parentId);
+        
+        // Store parentId in sessionStorage
+        window.sessionStorage.setItem('parentId', parentId);
+        
+        // Go to child form
         setPhase('child_form');
       } else {
+        // Sign in flow - skip OTP call for now, just go to dashboard
         window.location.href = '/dashboard.html';
       }
-    }, 900);
+    } catch (error) {
+      console.error('Error in handleOtpSubmit:', error);
+      setAuthError(getErrorMessage(error));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleResend = () => {
     if (countdown > 0) return;
+    setAuthError('');
     setOtp(['', '', '', '', '', '']);
     setOtpMessage({
       title: 'Code Resent Successfully',
-      subtitle: "We've sent a new 6-digit verification code to your registered device. Please check your messages."
+      subtitle: 'Enter your verification code (123456) to continue.'
     });
     setCountdown(30);
     otpRefs.current[0]?.focus();
@@ -206,6 +309,17 @@ function AuthPage() {
             </div>
           )}
 
+          {authError && (
+            <div style={{
+              color: '#ff6b6b',
+              fontSize: '14px',
+              marginBottom: '16px',
+              textAlign: 'center'
+            }}>
+              {authError}
+            </div>
+          )}
+
           <div className="forms-container">
             {mode === 'signup' && phase === 'parent_form' && (
               <form id="form-signup-parent" className="auth-form active" onSubmit={handleParentSubmit}>
@@ -213,7 +327,7 @@ function AuthPage() {
                   <label>Full Name</label>
                   <input name="userName" type="text" placeholder="John Doe" required />
                 </div>
-                
+
                 <div className="input-row">
                   <div className="input-group">
                     <label>Email Address</label>
@@ -222,7 +336,7 @@ function AuthPage() {
                   <div className="input-group phone-group">
                     <label>WhatsApp Number</label>
                     <div className="phone-input">
-                      <select className="country-code" defaultValue="+91">
+                      <select name="countryCode" className="country-code" defaultValue="+91">
                         <option value="+91">+91</option>
                         <option value="+1">+1</option>
                         <option value="+44">+44</option>
@@ -245,8 +359,8 @@ function AuthPage() {
 
                 <div className="input-group">
                   <label>Relation with Child</label>
-                  <select name="relationWithChild" style={{ padding: '12px 14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', background: 'rgba(0, 0, 0, 0.2)', color: 'var(--text-primary)', outline: 'none' }} required>
-                    <option value="" disabled selected>Select Relation</option>
+                  <select name="relationWithChild" style={{ padding: '12px 14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', background: 'rgba(0, 0, 0, 0.2)', color: 'var(--text-primary)', outline: 'none' }} required defaultValue="">
+                    <option value="" disabled>Select Relation</option>
                     <option value="Father">Father</option>
                     <option value="Mother">Mother</option>
                     <option value="Guardian">Guardian</option>
@@ -373,7 +487,7 @@ function AuthPage() {
                   <label>Child Name</label>
                   <input name="childName" type="text" placeholder="Alex" required />
                 </div>
-                
+
                 <div className="input-row">
                   <div className="input-group">
                     <label>Date of Birth</label>
@@ -381,8 +495,8 @@ function AuthPage() {
                   </div>
                   <div className="input-group">
                     <label>Gender</label>
-                    <select name="gender" style={{ padding: '12px 14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', background: 'rgba(0, 0, 0, 0.2)', color: 'var(--text-primary)', outline: 'none' }} required>
-                      <option value="" disabled selected>Select Gender</option>
+                    <select name="gender" style={{ padding: '12px 14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', background: 'rgba(0, 0, 0, 0.2)', color: 'var(--text-primary)', outline: 'none' }} required defaultValue="">
+                      <option value="" disabled>Select Gender</option>
                       <option value="Male">Male</option>
                       <option value="Female">Female</option>
                       <option value="Other">Other</option>

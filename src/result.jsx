@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './result.css';
-import { getAccountChildProfile, readStoredAssessment } from './api.js';
+import { getAccountChildProfile, getLatestAssessment } from './api.js';
 import { assessmentGroups } from './assessmentData.js';
+import { getAssessmentDiagnosis } from './api';
 
 const fallbackProfile = { name: 'Alex', age: '5' };
 
@@ -159,28 +160,62 @@ function analyzeAssessment(assessment) {
 function ResultPage() {
   const [profile, setProfile] = useState(fallbackProfile);
   const [assessment, setAssessment] = useState(null);
+  const [result, setResult] = useState(null);
+  const [isLoading, setIsLoading] = useState(true); 
 
   useEffect(() => {
-    let isMounted = true;
+    async function loadResult() {
+      try {
+        // Grab childId from your session (adjust this key if you store it differently)
+        const storedProfile = JSON.parse(sessionStorage.getItem('neurovice_child_profile') || '{}');
+        const childId = storedProfile.id || 1; 
 
-    getAccountChildProfile().then((childProfile) => {
-      if (isMounted) setProfile({ ...fallbackProfile, ...childProfile });
-    });
+        // Hit your Spring Boot POST endpoint
+        const response = await fetch(`/api/analysis/run?childId=${childId}`, {
+          method: 'POST'
+        });
 
-    if (isMounted) {
-      setAssessment(readStoredAssessment());
+        if (response.ok) {
+          const aiData = await response.json();
+          setResult(aiData); // Save the AI response (which should include .score and .interpretation)
+        }
+      } catch (error) {
+        console.error("Failed to fetch AI analysis from Spring Boot:", error);
+      }finally {
+        setIsLoading(false); // <--- ADD THIS FINALLY BLOCK
+      }
     }
 
-    return () => {
-      isMounted = false;
-    };
+    loadResult();
   }, []);
 
   const analysis = useMemo(() => analyzeAssessment(assessment), [assessment]);
   const guidance = analysis?.guidance ?? scoreBands[0];
-  const overallScore = analysis?.overallScore ?? 0;
+  
+  // MAGIC FIX: If the AI returns a score, use it. Otherwise, fallback to your local math.
+  // Use AI text if available, otherwise your local patternSummary
+  // Grab the exact AI score (with decimals) if it exists, otherwise fallback to 0
+  // Grab the score and force it to exactly two decimal places (e.g., 67.27)
+  const rawScore = result?.finalRiskScore ?? analysis?.overallScore ?? 0;
+  const displayScore = Number(rawScore).toFixed(2);
+
+  const displaySummary = result?.interpretation ?? analysis?.patternSummary;
 
   return (
+    <>
+      {/* --- ADD THIS LOADING OVERLAY --- */}
+      {isLoading && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: '#fcfcf8', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
+          <style>
+            {`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}
+          </style>
+          <div style={{ width: '56px', height: '56px', border: '5px solid rgba(42, 67, 58, 0.1)', borderTop: '5px solid #2a433a', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+          <p style={{ marginTop: '24px', fontFamily: "'Libre Franklin', sans-serif", fontSize: '16px', color: '#2a433a', fontWeight: '500' }}>
+            Analyzing results...
+          </p>
+        </div>
+      )}
+      {/* -------------------------------- */}
     <main className="result-page">
       <div className="result-bg" aria-hidden="true">
         <span className="result-ring ring-one"></span>
@@ -203,7 +238,7 @@ function ResultPage() {
           <p className="result-kicker">Dynamic screening result</p>
           <h1>{profile.name}'s result overview</h1>
           <p>
-            {analysis
+            {result || analysis
               ? `This page is generated from the latest saved assessment for age ${profile.age}, including a live concern score and domain-level subscores.`
               : 'Complete the assessment first to generate a live score, domain breakdown, and score-range-based guidance.'}
           </p>
@@ -218,12 +253,12 @@ function ResultPage() {
               <h2>What this pattern suggests</h2>
             </div>
 
-            {analysis ? (
+            {result || analysis ? (
               <>
-                <p>{analysis.patternSummary}</p>
+                <p>{displaySummary}</p>
                 <div className="diagnostic-banner">
                   <strong>{guidance.label}</strong>
-                  <span>Score band {analysis.bandLabel}. Use this as screening guidance only, not a diagnosis.</span>
+                  <span>Score band {analysis?.bandLabel || 'N/A'}. Use this as screening guidance only, not a diagnosis.</span>
                 </div>
               </>
             ) : (
@@ -263,10 +298,10 @@ function ResultPage() {
               <div className="score-circle-shell">
                 <div
                   className="score-circle"
-                  style={{ '--score-progress': `${overallScore}%` }}
-                  aria-label={`Screening score ${overallScore} out of 100`}
+                  style={{ '--score-progress': `${displayScore}%` }}
+                  aria-label={`Screening score ${displayScore} out of 100`}
                 >
-                  <strong>{overallScore}</strong>
+                  <strong style={{ position: 'relative', top: '18px', fontSize: '50px'}}>{displayScore}</strong>
                   <span>/100</span>
                 </div>
               </div>
@@ -275,8 +310,8 @@ function ResultPage() {
                 <span className="score-label">Overall concern score</span>
                 <p>{guidance.label}</p>
                 <small>
-                  {analysis
-                    ? `This score is grouped into the ${analysis.bandLabel} range and updates from the latest recorded answers.`
+                  {result || analysis
+                    ? `This score is grouped into the ${analysis?.bandLabel || 'N/A'} range and updates from the latest recorded answers.`
                     : 'A live score will appear here after a completed assessment is saved.'}
                 </small>
               </div>
@@ -314,6 +349,7 @@ function ResultPage() {
         </section>
       </section>
     </main>
+    </>
   );
 }
 
