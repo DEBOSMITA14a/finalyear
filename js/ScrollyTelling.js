@@ -8,7 +8,7 @@ export class ScrollyTelling {
     this.canvas = document.getElementById('hero-canvas');
     this.context = this.canvas.getContext('2d');
     
-    this.frameCount = 128;
+    this.frameCount = 99;
     this.images = [];
     this.imageSeq = { frame: 0 };
     
