@@ -119,8 +119,16 @@ const backendScoreKeys = [
   'riskScore',
   'overallScore',
   'finalScore',
+  'overallRiskScore',
+  'riskPercentage',
+  'riskPercent',
+  'percentage',
+  'predictedScore',
+  'predictionScore',
   'final_risk_score',
-  'risk_score'
+  'risk_score',
+  'overall_risk_score',
+  'risk_percentage'
 ];
 
 function clampScore(value) {
@@ -299,7 +307,19 @@ function ResultPage() {
 
       try {
         let activeProfile = readStoredProfile();
-        let childId = activeProfile?.id ?? activeProfile?.childId;
+
+        // dashboard.jsx already sends the real ID as:
+        // /result.html?childId=123
+        // Prefer that value, then fall back to the stored profile.
+        const urlChildId = new URLSearchParams(
+          window.location.search
+        ).get('childId');
+
+        let childId =
+          urlChildId ??
+          activeProfile?.id ??
+          activeProfile?.childId ??
+          null;
 
         if (!childId) {
           const accountProfile = await getAccountChildProfile();
@@ -308,7 +328,12 @@ function ResultPage() {
             ...activeProfile,
             ...accountProfile
           };
-          childId = activeProfile?.id ?? activeProfile?.childId;
+
+          childId =
+            urlChildId ??
+            activeProfile?.id ??
+            activeProfile?.childId ??
+            null;
         }
 
         if (!isCancelled) {
@@ -374,7 +399,10 @@ function ResultPage() {
   );
 
   const backendScore = normalizedResult.score;
-  const rawScore = backendScore ?? analysis?.overallScore ?? null;
+
+  // Do not replace a missing backend score with a locally calculated zero.
+  // A real 0 will still display when the backend genuinely returns 0.
+  const rawScore = backendScore;
   const hasValidScore = Number.isFinite(rawScore);
   const finalScore = hasValidScore ? clampScore(rawScore) : null;
   const bandStart = hasValidScore ? getBandStart(finalScore) : 0;

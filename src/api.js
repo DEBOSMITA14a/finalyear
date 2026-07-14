@@ -318,10 +318,37 @@ export async function getAssessmentDiagnosis(assessmentId) {
 }
 
 export async function runAnalysis(childId) {
-  const params = new URLSearchParams({ childId: String(childId) });
-  return apiRequest(`${API_ENDPOINTS.runAnalysis}?${params.toString()}`, {
-    method: 'POST'
+  const params = new URLSearchParams({
+    childId: String(childId)
   });
+
+  const endpoint =
+    `${API_ENDPOINTS.runAnalysis}?${params.toString()}`;
+
+  try {
+    return await apiRequest(endpoint, {
+      method: 'POST'
+    });
+  } catch (postError) {
+    // Try GET when the backend does not accept POST,
+    // or when the POST request is blocked before a response arrives.
+    if (
+      postError?.status &&
+      postError.status !== 404 &&
+      postError.status !== 405
+    ) {
+      throw postError;
+    }
+
+    console.warn(
+      'POST analysis request failed. Trying GET instead.',
+      postError
+    );
+
+    return apiRequest(endpoint, {
+      method: 'GET'
+    });
+  }
 }
 
 export async function sendGameData(payload) {
