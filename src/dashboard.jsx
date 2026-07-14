@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './dashboard.css';
-import { getAccountChildProfile, hasStoredAssessment } from './api.js';
+import { readStoredChildProfile, hasStoredAssessment } from './api.js';
 
 const fallbackProfile = {
   name: 'Alex',
@@ -37,7 +37,7 @@ const steps = [
     label: 'Results',
     title: 'Diagnostic Report',
     eyebrow: 'Screening interpretation & guidance',
-    copy: "Review your child's detailed performance analysis, attention profile, and recommended next steps or professional guidance.",
+    copy: 'Review your child\'s detailed performance analysis, attention profile, and recommended next steps or professional guidance.',
     duration: 'Ready',
     primary: 'View results',
     repeat: 'View results'
@@ -47,7 +47,40 @@ const steps = [
 function DashboardPage() {
   const [profile, setProfile] = useState(fallbackProfile);
   const [activeStep, setActiveStep] = useState(0);
-  const [completed, setCompleted] = useState(() => new Set());
+
+  // 1. Load what is completed
+  const [completed, setCompleted] = useState(() => {
+    const completedSet = new Set();
+    if (hasStoredAssessment()) completedSet.add('assessment');
+    try {
+      const stored = window.sessionStorage.getItem('neurovice_completed_steps');
+      if (stored) {
+        JSON.parse(stored).forEach(id => completedSet.add(id));
+      }
+    } catch (e) {
+      console.error("Failed parsing steps", e);
+    }
+    return completedSet;
+  });
+
+  // 2. AGGRESSIVE AUTO-ADVANCE: Forcibly lock the UI to the correct step
+  useEffect(() => {
+    if (completed.has('game-one')) {
+      setActiveStep(2); // Instantly force Step 3 (Results)
+    } else if (completed.has('assessment')) {
+      setActiveStep(1); // Instantly force Step 2 (Game)
+    } else {
+      setActiveStep(0);
+    }
+  }, [completed]);
+
+  // 3. Load Profile Name
+  useEffect(() => {
+    const storedProfile = readStoredChildProfile();
+    if (storedProfile && storedProfile.name) {
+      setProfile(storedProfile);
+    }
+  }, []);
 
   const active = steps[activeStep];
   const completedCount = completed.size;
@@ -58,39 +91,11 @@ function DashboardPage() {
   const stageState = useMemo(() => {
     return steps.map((step, index) => {
       if (completed.has(step.id)) return 'complete';
+      if (step.id === 'result' && completed.has('game-one')) return 'ready';
       if (index === 0 || completed.has(steps[index - 1].id)) return 'ready';
       return 'locked';
     });
   }, [completed]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    getAccountChildProfile().then((childProfile) => {
-      if (isMounted) setProfile({ ...fallbackProfile, ...childProfile });
-    });
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    const completedSet = new Set();
-    if (hasStoredAssessment()) {
-      completedSet.add('assessment');
-    }
-    try {
-      const stored = window.sessionStorage.getItem('neurovice_completed_steps');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        parsed.forEach(id => completedSet.add(id));
-      }
-    } catch (e) {
-      console.error('Failed to load completed steps', e);
-    }
-    setCompleted(completedSet);
-  }, []);
 
   const completeCurrentStep = () => {
     setCompleted((previous) => {
@@ -110,7 +115,27 @@ function DashboardPage() {
       window.location.href = '/assessment.html';
     } else if (active.id === 'result') {
       completeCurrentStep();
-      window.location.href = '/result.html';
+      
+      // BULLETPROOF ID FETCH: Grab it right when the button is clicked, directly from storage
+      let currentChildId = profile?.id;
+      try {
+        const sessionProfile = JSON.parse(sessionStorage.getItem('neurovice_child_profile') || 'null');
+        const localProfile = JSON.parse(localStorage.getItem('neurovice_child_profile') || 'null');
+        currentChildId = sessionProfile?.id || localProfile?.id || currentChildId;
+      } catch(e) {
+        console.error("Error reading storage during click", e);
+      }
+
+      if (!currentChildId) {
+        alert("System error: Could not find the Child ID. Please ensure you are logged in and try again.");
+        return; // Stops navigation if the ID is missing so you don't hit a broken API
+      }
+
+      // Sends the real ID perfectly to the URL
+      window.location.href = `/result.html?childId=${currentChildId}`;
+      
+    } else if (active.id === 'game-one') {
+      window.location.href = '/game.html'; 
     } else {
       completeCurrentStep();
     }
@@ -146,7 +171,7 @@ function DashboardPage() {
       <section className="dashboard-hero">
         <div className="child-summary">
           <span className="dashboard-kicker">Child profile</span>
-          <h1>{profile.name}'s care path</h1>
+          <h1>{profile.name}&apos;s care path</h1>
           <p>Age {profile.age}. Start with the assessment, then move through each game when you are ready.</p>
           <div className="child-meta">
             <span>{progress}% path complete</span>
