@@ -156,6 +156,72 @@ function getBandLabel(start) {
   return start === 90 ? '90-100' : `${start}-${start + 9}`;
 }
 
+
+function createDerivedDomainScores(overallScore) {
+  if (!Number.isFinite(overallScore)) return [];
+
+  /*
+   * Temporary fallback only:
+   * These five scores are deterministically derived from the real backend
+   * overall score. Their average stays close to the overall score, while
+   * attention/activity are slightly higher and conduct/safety is lower.
+   *
+   * When real backend domain scores become available, they should be used
+   * instead of this fallback.
+   */
+  const score = clampScore(overallScore);
+  const spread = Math.max(
+    6,
+    Math.min(16, 6 + score * 0.16)
+  );
+
+  const domainProfiles = [
+    {
+      id: 'attention',
+      title: 'Attention and Follow-Through',
+      shortTitle: 'Attention',
+      theme: 'mint',
+      offset: 0.55
+    },
+    {
+      id: 'activity',
+      title: 'Activity and Impulse Control',
+      shortTitle: 'Activity',
+      theme: 'coral',
+      offset: 0.3
+    },
+    {
+      id: 'oppositional',
+      title: 'Oppositional Patterns',
+      shortTitle: 'Opposition',
+      theme: 'gold',
+      offset: -0.05
+    },
+    {
+      id: 'conduct',
+      title: 'Conduct and Safety',
+      shortTitle: 'Safety',
+      theme: 'blue',
+      offset: -0.8
+    },
+    {
+      id: 'emotional-performance',
+      title: 'Emotional Wellbeing and Performance',
+      shortTitle: 'Wellbeing',
+      theme: 'rose',
+      offset: 0
+    }
+  ];
+
+  return domainProfiles.map((domain) => ({
+    ...domain,
+    score: Math.round(
+      clampScore(score + spread * domain.offset)
+    ),
+    isDerived: true
+  }));
+}
+
 function analyzeAssessment(assessment) {
   const answers = assessment?.answers || [];
 
@@ -419,6 +485,20 @@ function ResultPage() {
   const hasResult =
     hasValidScore || Boolean(normalizedResult.payload) || Boolean(analysis);
 
+  const domainScores = useMemo(() => {
+    const realSubscores = analysis?.subscores || [];
+
+    if (realSubscores.length > 0) {
+      return realSubscores;
+    }
+
+    return createDerivedDomainScores(finalScore);
+  }, [analysis, finalScore]);
+
+  const usesDerivedDomainScores =
+    domainScores.length > 0 &&
+    domainScores.every((item) => item.isDerived);
+
   return (
     <>
       {isLoading && (
@@ -604,7 +684,7 @@ function ResultPage() {
               </div>
 
               <div className="score-list">
-                {(analysis?.subscores || []).map((item) => (
+                {domainScores.map((item) => (
                   <div
                     className={`score-item tone-${item.theme}`}
                     key={item.id}
@@ -627,11 +707,20 @@ function ResultPage() {
                   </div>
                 ))}
 
-                {!analysis && (
+                {usesDerivedDomainScores && (
                   <div className="result-empty-state">
                     <p>
-                      Subscores will appear here after the assessment is
-                      completed and saved.
+                      These domain values are estimated from the overall
+                      backend score and are shown as a temporary preview.
+                    </p>
+                  </div>
+                )}
+
+                {!hasValidScore && domainScores.length === 0 && (
+                  <div className="result-empty-state">
+                    <p>
+                      Domain values will appear after a valid overall score
+                      is available.
                     </p>
                   </div>
                 )}
